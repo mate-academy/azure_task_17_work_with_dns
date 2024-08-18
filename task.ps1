@@ -80,5 +80,19 @@ New-AzVm `
 -SshKeyName $sshKeyName `
 -PublicIpAddressName $jumpboxVmName
 
+# Deploying private DNS zone
+Write-Host "Creating private DNS zone $privateDnsZoneName ..."
+$dnsZone = New-AzPrivateDnsZone -ResourceGroupName $resourceGroupName -Name $privateDnsZoneName
 
-# Write your code here  -> 
+# Linking the private DNS zone to the virtual network with auto-registration enabled
+Write-Host "Linking the private DNS zone to the virtual network ..."
+New-AzPrivateDnsVirtualNetworkLink -ResourceGroupName $resourceGroupName -ZoneName $privateDnsZoneName `
+    -Name "$virtualNetworkName-link" -VirtualNetworkId $virtualNetwork.Id -EnableRegistration
+
+# Create CNAME record for the webserver in the private DNS zone
+Write-Host "Creating CNAME record for the webserver in the private DNS zone ..."
+$cnameRecord = New-AzPrivateDnsRecordSet -Name "todo" -RecordType CNAME -ZoneName $privateDnsZoneName -ResourceGroupName $resourceGroupName
+Add-AzPrivateDnsRecordConfig -RecordSet $cnameRecord -Cname "$webVmName.$privateDnsZoneName"
+Set-AzPrivateDnsRecordSet -RecordSet $cnameRecord
+
+Write-Host "Script execution completed."
