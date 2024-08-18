@@ -82,7 +82,7 @@ New-AzVm `
 
 # Deploying private DNS zone
 Write-Host "Creating private DNS zone $privateDnsZoneName ..."
-$dnsZone = New-AzPrivateDnsZone -ResourceGroupName $resourceGroupName -Name $privateDnsZoneName -Location $location
+$dnsZone = New-AzPrivateDnsZone -ResourceGroupName $resourceGroupName -Name $privateDnsZoneName
 
 # Linking the private DNS zone to the virtual network with auto-registration enabled
 Write-Host "Linking the private DNS zone to the virtual network ..."
