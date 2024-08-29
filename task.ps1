@@ -9,7 +9,7 @@ $mngSubnetName = "management"
 $mngSubnetIpRange = "10.20.30.128/26"
 
 $sshKeyName = "linuxboxsshkey"
-$sshKeyPublicKey = Get-Content "~/.ssh/id_rsa.pub"
+$sshKeyPublicKey = Get-Content "./key.txt"
 
 $vmImage = "Ubuntu2204"
 $vmSize = "Standard_B1s"
@@ -86,4 +86,4 @@ New-AzPrivateDnsZone -Name $privateDnsZoneName -ResourceGroupName $resourceGroup
 New-AzPrivateDnsVirtualNetworkLink -ZoneName $privateDnsZoneName -ResourceGroupName $resourceGroupName -Name $linkName -VirtualNetworkId $virtualNetwork.Id -EnableRegistration
 $Records = @()
 $Records += New-AzPrivateDnsRecordConfig -Cname "$webVmName.$privateDnsZoneName"
-$RecordSet = New-AzPrivateDnsRecordSet -Name "todo" -RecordType CNAME -ResourceGroupName $resourceGroupName -TTL 3600 -ZoneName $privateDnsZoneName -PrivateDnsRecords $Records
+New-AzPrivateDnsRecordSet -Name "todo" -RecordType CNAME -ResourceGroupName $resourceGroupName -TTL 3600 -ZoneName $privateDnsZoneName -PrivateDnsRecords $Records
