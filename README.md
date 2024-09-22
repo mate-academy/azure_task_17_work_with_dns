@@ -86,3 +86,26 @@ Here is how to complete tasks in this module:
 
 Pro tip: if you are stuck with any of the implementation steps, run `scripts/generate-artifacts.ps1` and `scripts/validate-artifacts.ps1`. The validation script might give you a hint on what to do.  
 
+## Results of the initial task code review:
+
+1. Code was refactored for better readability
+2. URLs in the Install script and in Powershell code were amended to properly refer to my updated code
+3. VM deployment process was reworked through the `New-AzVMConfig` + `...` + `New-AzVM` form in order to:
+
+    * set proper OS disk size to meet the "Free services for 12 months" limitations
+    * set custom names, instead of random generic ones for:
+
+      * OS disks
+      * Network Interface Configurations
+      * IP Configs
+      * Boot Diagnostic Storage Account
+
+## The Task's Scope Solution:
+
+1. Private DNS Zone was created with `New-AzPrivateDnsZone`
+2. Both deployed VMs had private subdomain DNS auto-assigned using `New-AzPrivateDnsVirtualNetworkLink`
+3. Web VM subdomain was reassigned to `DesiredSubdomain` "**todo**" using `New-AzPrivateDnsRecordSet`
+    where:
+
+    * Name refers to desired subdomain
+    * PrivateDnsRecords's record is constructed as `oldSubdomainName`.`privateDnsZoneName`

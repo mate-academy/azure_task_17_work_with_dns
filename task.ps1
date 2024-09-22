@@ -1,6 +1,7 @@
 $location =                             "uksouth"
 $resourceGroupName =                    "mate-azure-task-17"
 
+# Network Settings
 $virtualNetworkName =                   "todoapp"
 $vnetAddressPrefix =                    "10.20.30.0/24"
 
@@ -10,22 +11,26 @@ $webSubnetIpRange =                     "10.20.30.0/26"
 $mngSubnetName =                        "management"
 $mngSubnetIpRange =                     "10.20.30.128/26"
 
+# SSH settings
 $sshKeyName =                           "linuxboxsshkey"
 $sshKeyPublicKey =                      Get-Content "~/.ssh/id_rsa.pub"
 
+# DNS settings
+$privateDnsZoneName =                   "or.nottodo"
+$webSetSubdomain =                      "todo"
+
 # Boot Diagnostic Storage Account settings
-$bootStorageAccName =         "bootdiagnosstorageacc"
-$bootStSkuName =              "Standard_LRS"
-$bootStKind =                 "StorageV2"
-$bootStAccessTier =           "Hot"
-$bootStMinimumTlsVersion =    "TLS1_0"
+$bootStorageAccName =                   "bootdiagnosstorageacc"
+$bootStSkuName =                        "Standard_LRS"
+$bootStKind =                           "StorageV2"
+$bootStAccessTier =                     "Hot"
+$bootStMinimumTlsVersion =              "TLS1_0"
 
 # VM settings
 $vmSize =                               "Standard_B1s"
 $webVmName =                            "webserver"
 $jumpboxVmName =                        "jumpbox"
 $dnsLabel =                             "matetask" + (Get-Random -Count 1)
-$privateDnsZoneName =                   "or.nottodo"
 
 # OS settings:
 $osUser =                               "yegor"
@@ -168,7 +173,7 @@ New-AzVM `
   -ResourceGroupName                    $resourceGroupName `
   -Location                             $location `
   -VM                                   $vmconfig
-$scriptUrl = "https://github.com/YegorVolkov/azure_task_17_work_with_dns/blob/dev/install-app.sh"
+$scriptUrl = "https://raw.githubusercontent.com/YegorVolkov/azure_task_17_work_with_dns/dev/install-app.sh"
 Set-AzVMExtension `
   -ResourceGroupName                    $resourceGroupName `
   -VMName                               $webVmName `
@@ -214,7 +219,7 @@ New-AzNetworkInterface -Force `
 Write-Host "Creating a management VM ..."
 $vmconfig = New-AzVMConfig `
   -VMName                               $jumpboxVmName `
-  -VMSize                               $vmSize `
+  -VMSize                               $vmSize
 $vmconfig = Set-AzVMSourceImage `
   -VM                                   $vmconfig `
   -PublisherName                        $osPublisherName `
@@ -249,24 +254,27 @@ New-AzVM `
   -VM                                   $vmconfig `
   -SshKeyName                           $sshKeyName
 
+Write-Host "Creating a Private Dns Zone ..."
 New-AzPrivateDnsZone `
   -Name                                 $privateDnsZoneName `
   -ResourceGroupName                    $resourceGroupName
 
+Write-Host "Auto-Assigning the DNS to VMs via 'Private Dns Virtual Network Link' ..."
 New-AzPrivateDnsVirtualNetworkLink `
-  -Name                                 "${$privateDnsZoneName}-Link" `
+  -Name                                 "dnslink" `
   -ResourceGroupName                    $resourceGroupName `
   -ZoneName                             $privateDnsZoneName `
-  -VirtualNetwork                       $vnetObj.Id `
+  -VirtualNetworkId                     $vnetObj.Id `
   -EnableRegistration
 
+Write-Host "Assigning the Desired subdomain to management VM ..."
 New-AzPrivateDnsRecordSet `
-  -Name                                 "${webVmName}.${privateDnsZoneName}" `
+  -Name                                 $webSetSubdomain `
   -RecordType                           CNAME `
   -ResourceGroupName                    $resourceGroupName `
   -TTL                                  3600 `
   -ZoneName                             $privateDnsZoneName `
   -PrivateDnsRecords                    @(
     New-AzPrivateDnsRecordConfig `
-      -Cname                            "todo.${privateDnsZoneName}"
+      -Cname                            "${webVmName}.${privateDnsZoneName}"
     )
