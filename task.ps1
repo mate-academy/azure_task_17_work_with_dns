@@ -18,6 +18,8 @@ $jumpboxVmName = "jumpbox"
 $dnsLabel = "matetask" + (Get-Random -Count 1)
 
 $privateDnsZoneName = "or.nottodo"
+$recordName = "todo"
+$vnetLinkName = "mylink"
 
 
 Write-Host "Creating a resource group $resourceGroupName ..."
@@ -68,6 +70,7 @@ Set-AzVMExtension @Params
 
 Write-Host "Creating a public IP ..."
 $publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Basic -AllocationMethod Dynamic -DomainNameLabel $dnsLabel
+
 Write-Host "Creating a management VM ..."
 New-AzVm `
 -ResourceGroupName $resourceGroupName `
@@ -78,7 +81,15 @@ New-AzVm `
 -SubnetName $mngSubnetName `
 -VirtualNetworkName $virtualNetworkName `
 -SshKeyName $sshKeyName `
--PublicIpAddressName $jumpboxVmName
+-PublicIpAddressName $publicIP.Name
 
+Write-Host "Creating private DNS zone: $privateDnsZoneName ..."
+New-AzPrivateDnsZone -Name $privateDnsZoneName -ResourceGroupName $resourceGroupName
 
-# Write your code here  -> 
+Write-Host "Linking DNS zone to the virtual network: $vnetLinkName ..."
+New-AzPrivateDnsVirtualNetworkLink -ZoneName $privateDnsZoneName -ResourceGroupName $resourceGroupName -Name $vnetLinkName -VirtualNetworkId $virtualNetwork.Id -EnableRegistration
+
+Write-Host "Creating CNAME record for the virtual machine: $webVmName ..."
+$Records = @()
+$Records += New-AzPrivateDnsRecordConfig -Cname "$webVmName.$privateDnsZoneName"
+New-AzPrivateDnsRecordSet -Name $recordName -RecordType CNAME -ResourceGroupName $resourceGroupName -TTL 3600 -ZoneName $privateDnsZoneName -PrivateDnsRecords $Records
