@@ -35,35 +35,35 @@ If you are a Windows user, before running this command, please also run the foll
 
 ## Requirements
 
-In this task, you will need to update the existing PowerShell script `task.ps1`. The original script deploys 2 virtual machines: 
+In this task, you will need to update the existing PowerShell script `task.ps1`. The original script deploys 2 virtual machines:
 
 - `webserver`, used to host the todo web app. It's deployed in a subnet `web`, without public IP.
 - `jumpbox`, used as a dedicated virtual machine for management of `webserver`. It is deployed to a separate subnet, has a public IP, and allows connecting to it through SSH.  
 
-In this task, you need to deploy a private DNS zone `todo.or.nottodo` and create a DNS record in it: 
+In this task, you need to deploy a private DNS zone `todo.or.nottodo` and create a DNS record in it:
 
 1. Review the script `task.ps1`.  
 
-2. Add deployment of private DNS zone `or.nottodo`. To deploy a private DNS zone, use comandlet [New-AzPrivateDnsZone](https://learn.microsoft.com/en-us/powershell/module/az.privatedns/new-azprivatednszone?view=azps-12.0.0). 
+2. Add deployment of private DNS zone `or.nottodo`. To deploy a private DNS zone, use comandlet [New-AzPrivateDnsZone](https://learn.microsoft.com/en-us/powershell/module/az.privatedns/new-azprivatednszone?view=azps-12.0.0).
 
-3. Don't forget to add linking of the newly-created DNS zone to the virtual network, where VMs are deployed. You can do it with comandlet [New-AzPrivateDnsVirtualNetworkLink](https://learn.microsoft.com/en-us/powershell/module/az.privatedns/new-azprivatednsvirtualnetworklink?view=azps-12.0.0). Make sure to enable [auto-registration](https://learn.microsoft.com/en-us/azure/dns/private-dns-autoregistration) feature when creating a link. 
+3. Don't forget to add linking of the newly-created DNS zone to the virtual network, where VMs are deployed. You can do it with comandlet [New-AzPrivateDnsVirtualNetworkLink](https://learn.microsoft.com/en-us/powershell/module/az.privatedns/new-azprivatednsvirtualnetworklink?view=azps-12.0.0). Make sure to enable [auto-registration](https://learn.microsoft.com/en-us/azure/dns/private-dns-autoregistration) feature when creating a link.
 
-4. Add creating of a `CNAME` record in the private DNS zone — use comandlet [New-AzPrivateDnsRecordSet](https://learn.microsoft.com/en-us/powershell/module/az.privatedns/new-azprivatednsrecordset?view=azps-12.0.0). `CNAME` should point domain `todo.or.nottodo` to the domain, `webserver` virtual machine will get with auto-registration in the private DNS zone. 
+4. Add creating of a `CNAME` record in the private DNS zone — use comandlet [New-AzPrivateDnsRecordSet](https://learn.microsoft.com/en-us/powershell/module/az.privatedns/new-azprivatednsrecordset?view=azps-12.0.0). `CNAME` should point domain `todo.or.nottodo` to the domain, `webserver` virtual machine will get with auto-registration in the private DNS zone.
 
 5. When the script is ready, run it to deploy resources to your subscription.
 
-6. To test yourself, connect to the `jumbox` VM with SSH, and test with curl, if you can get to the todo web app by its domain name `todo.or.nottodo` (app will be running on `port 8080`, so you will need to use the following URL for curl: `http://todo.or.nottodo:8080/`). 
+6. To test yourself, connect to the `jumbox` VM with SSH, and test with curl, if you can get to the todo web app by its domain name `todo.or.nottodo` (app will be running on `port 8080`, so you will need to use the following URL for curl: `http://todo.or.nottodo:8080/`).
 
 7. Run artifacts generation script `scripts/generate-artifacts.ps1`.
 
 8. Test yourself using the script `scripts/validate-artifacts.ps1`.
 
-9. Make sure that changes to both `task.ps1` and `result.json` are committed to the repo, and submit the solution for review. 
+9. Make sure that changes to both `task.ps1` and `result.json` are committed to the repo, and submit the solution for review.
 
-10. When the solution is validated, delete the resources you deployed with the PowerShell script — you won't need them for the next tasks. 
+10. When the solution is validated, delete the resources you deployed with the PowerShell script — you won't need them for the next tasks.
 
 
-## How to Complete Tasks in This Module 
+## How to Complete Tasks in This Module
 
 Tasks in this module are relying on 2 PowerShell scripts: 
 
