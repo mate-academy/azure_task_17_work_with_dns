@@ -9,7 +9,7 @@ $mngSubnetName = "management"
 $mngSubnetIpRange = "10.20.30.128/26"
 
 $sshKeyName = "linuxboxsshkey"
-$sshKeyPublicKey = Get-Content "~/.ssh/id_rsa.pub"
+$sshKeyPublicKey = Get-Content "C:\Users\admin\.ssh\id_rsa.pub"
 
 $vmImage = "Ubuntu2204"
 $vmSize = "Standard_B1s"
@@ -54,7 +54,7 @@ New-AzVm `
 -size $vmSize `
 -SubnetName $webSubnetName `
 -VirtualNetworkName $virtualNetworkName `
--SshKeyName $sshKeyName 
+-SshKeyName $sshKeyName
 $Params = @{
     ResourceGroupName  = $resourceGroupName
     VMName             = $webVmName
@@ -67,7 +67,7 @@ $Params = @{
 Set-AzVMExtension @Params
 
 Write-Host "Creating a public IP ..."
-$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Basic -AllocationMethod Dynamic -DomainNameLabel $dnsLabel
+New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Basic -AllocationMethod Dynamic -DomainNameLabel $dnsLabel
 Write-Host "Creating a management VM ..."
 New-AzVm `
 -ResourceGroupName $resourceGroupName `
@@ -81,4 +81,21 @@ New-AzVm `
 -PublicIpAddressName $jumpboxVmName
 
 
-# Write your code here  -> 
+# # Write your code here  ->
+
+# Add Private DNS Zone
+Write-Host "Creating a private DNS zone ..."
+$privateDnsZone = New-AzPrivateDnsZone -ResourceGroupName $resourceGroupName -Name $privateDnsZoneName
+
+Write-Host "Linking private DNS zone to virtual network ..."
+New-AzPrivateDnsVirtualNetworkLink -ResourceGroupName $resourceGroupName -ZoneName $privateDnsZoneName `
+-VirtualNetworkId $virtualNetwork.Id -Name "$($virtualNetworkName)-dnslink" -EnableRegistration
+
+# Add CNAME Record
+Write-Host "Creating CNAME record in the private DNS zone ..."
+$cnameRecord = New-AzPrivateDnsRecordSet -Name "todo" -RecordType CNAME -ZoneName $privateDnsZoneName -ResourceGroupName $resourceGroupName
+Add-AzPrivateDnsRecordConfig -RecordSet $cnameRecord -Cname "$webVmName.$privateDnsZoneName"
+Set-AzPrivateDnsRecordSet -RecordSet $cnameRecord
+
+Write-Host "Public IP Address for Jumpbox: $($publicIP.IpAddress)"
+Write-Host "Private DNS Zone created: $($privateDnsZone.Name)"
