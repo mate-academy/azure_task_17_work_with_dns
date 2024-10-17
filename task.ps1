@@ -97,5 +97,4 @@ $cnameRecord = New-AzPrivateDnsRecordSet -Name "todo" -RecordType CNAME -ZoneNam
 Add-AzPrivateDnsRecordConfig -RecordSet $cnameRecord -Cname "$webVmName.$privateDnsZoneName"
 Set-AzPrivateDnsRecordSet -RecordSet $cnameRecord
 
-Write-Host "Public IP Address for Jumpbox: $($publicIP.IpAddress)"
-Write-Host "Private DNS Zone created: $($privateDnsZone.Name)"
+
