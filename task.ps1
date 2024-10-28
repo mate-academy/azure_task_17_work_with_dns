@@ -54,7 +54,7 @@ New-AzVm `
 -size $vmSize `
 -SubnetName $webSubnetName `
 -VirtualNetworkName $virtualNetworkName `
--SshKeyName $sshKeyName 
+-SshKeyName $sshKeyName
 $Params = @{
     ResourceGroupName  = $resourceGroupName
     VMName             = $webVmName
@@ -82,3 +82,28 @@ New-AzVm `
 
 
 # Write your code here  -> 
+
+Write-Host "Creating a Private Dns Zone ..."
+New-AzPrivateDnsZone `
+   -ResourceGroupName $resourceGroupName `
+   -Name $privateDnsZoneName
+
+Write-Host "Creating a Private Dns Virtual Network Link ..."
+New-AzPrivateDnsVirtualNetworkLink `
+   -ResourceGroupName $resourceGroupName `
+   -ZoneName $privateDnsZoneName `
+   -Name "$privateDnsZoneName.VNL" `
+   -VirtualNetwork $virtualNetwork `
+   -EnableRegistration
+
+$Records = @()
+$Records += New-AzPrivateDnsRecordConfig -Cname "$webVmName.$privateDnsZoneName"
+
+Write-Host "Creating a Private Dns Record Set ..."
+New-AzPrivateDnsRecordSet `
+   -ResourceGroupName $resourceGroupName `
+   -ZoneName $privateDnsZoneName `
+   -Name $privateDnsZoneName `
+   -RecordType CNAME `
+   -Ttl 3600 `
+   -PrivateDnsRecords $Records
