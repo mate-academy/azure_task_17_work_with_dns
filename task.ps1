@@ -81,4 +81,25 @@ New-AzVm `
 -PublicIpAddressName $jumpboxVmName
 
 
-# Write your code here  -> 
+# Write your code here  ->
+Write-Host "Creating private DNS zone $privateDnsZoneName ..."
+New-AzPrivateDnsZone `
+    -ResourceGroupName $resourceGroupName `
+    -Name $privateDnsZoneName
+
+Write-Host "Linking DNS Zone to VN with auto-registration enabled..."
+New-AzPrivateDnsVirtualNetworkLink `
+    -ResourceGroupName $resourceGroupName `
+    -ZoneName $privateDnsZoneName `
+    -Name "$privateDnsZoneName.dnsLink" `
+    -VirtualNetwork $virtualNetwork `
+    -EnableRegistration
+
+New-AzPrivateDnsRecordSet `
+    -ResourceGroupName $resourceGroupName `
+    -ZoneName $privateDnsZoneName `
+    -Name "todo" `
+    -RecordType CNAME `
+    -Ttl 3600 `
+    -PrivateDnsRecords `
+        (New-AzPrivateDnsRecordConfig -Cname "$webVmName.$privateDnsZoneName")
