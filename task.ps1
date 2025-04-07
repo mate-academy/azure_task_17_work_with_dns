@@ -45,16 +45,24 @@ $virtualNetwork = New-AzVirtualNetwork -Name $virtualNetworkName -ResourceGroupN
 Write-Host "Creating a SSH key resource ..."
 New-AzSshKey -Name $sshKeyName -ResourceGroupName $resourceGroupName -PublicKey $sshKeyPublicKey
 
+Write-Host "Creating private DNS zone..."
+$privateDnsZone = New-AzPrivateDnsZone -Name $privateDnsZoneName -ResourceGroupName $resourceGroupName
+
+Write-Host "Linking private DNS zone to virtual network with auto-registration..."
+$dnsLink = New-AzPrivateDnsVirtualNetworkLink -ZoneName $privateDnsZoneName -ResourceGroupName $resourceGroupName `
+    -Name "vnetlink" -VirtualNetworkId $virtualNetwork.Id -EnableRegistration
+
 Write-Host "Creating a web server VM ..."
-New-AzVm `
+$webVm = New-AzVm `
 -ResourceGroupName $resourceGroupName `
 -Name $webVmName `
 -Location $location `
--image $vmImage `
--size $vmSize `
+-Image $vmImage `
+-Size $vmSize `
 -SubnetName $webSubnetName `
 -VirtualNetworkName $virtualNetworkName `
--SshKeyName $sshKeyName 
+-SshKeyName $sshKeyName
+
 $Params = @{
     ResourceGroupName  = $resourceGroupName
     VMName             = $webVmName
@@ -63,7 +71,7 @@ $Params = @{
     ExtensionType      = 'CustomScript'
     TypeHandlerVersion = '2.1'
     Settings          = @{fileUris = @('https://raw.githubusercontent.com/mate-academy/azure_task_17_work_with_dns/main/install-app.sh'); commandToExecute = './install-app.sh'}
- }
+}
 Set-AzVMExtension @Params
 
 Write-Host "Creating a public IP ..."
@@ -73,12 +81,21 @@ New-AzVm `
 -ResourceGroupName $resourceGroupName `
 -Name $jumpboxVmName `
 -Location $location `
--image $vmImage `
--size $vmSize `
+-Image $vmImage `
+-Size $vmSize `
 -SubnetName $mngSubnetName `
 -VirtualNetworkName $virtualNetworkName `
 -SshKeyName $sshKeyName `
 -PublicIpAddressName $jumpboxVmName
 
+# Wait for auto-registration to complete
+Write-Host "Waiting for DNS auto-registration..."
+Start-Sleep -Seconds 60
 
-# Write your code here  -> 
+# Create CNAME record (corrected version)
+Write-Host "Creating CNAME record in private DNS zone..."
+$cnameConfig = New-AzPrivateDnsRecordConfig -Cname "$webVmName.$privateDnsZoneName."
+New-AzPrivateDnsRecordSet -Name "todo" -RecordType CNAME -ZoneName $privateDnsZoneName `
+    -ResourceGroupName $resourceGroupName -Ttl 3600 -PrivateDnsRecords $cnameConfig
+
+Write-Host "Deployment completed successfully!"

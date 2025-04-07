@@ -1,0 +1,22 @@
+Id                : /subscriptions/baf1bb4f-888c-4ae1-a401-0adf409b029b/resourceGroups/mate-azure-task-17/providers/Microsoft.Network/privateDnsZones/or.nottodo/CNAME/todo
+Name              : todo
+ZoneName          : or.nottodo
+ResourceGroupName : mate-azure-task-17
+Ttl               : 3600
+Etag              : 897b9488-b9dc-47b6-9f29-3b64909fbaff
+RecordType        : Cname
+Records           : {webserver}
+Metadata          : 
+IsAutoRegistered  : False
+
+
+Id                : /subscriptions/baf1bb4f-888c-4ae1-a401-0adf409b029b/resourceGroups/mate-azure-task-17/providers/Microsoft.Network/privateDnsZones/or.nottodo/CNAME/todo
+Name              : todo
+ZoneName          : or.nottodo
+ResourceGroupName : mate-azure-task-17
+Ttl               : 3600
+Etag              : a4bb8102-6a21-4f50-b216-c578aae18eac
+RecordType        : Cname
+Records           : {webserver}
+Metadata          : 
+IsAutoRegistered  : False
