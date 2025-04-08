@@ -164,14 +164,14 @@ if ($dnsZoneLink.properties.registrationEnabled) {
 }
 
 $cname = ( $TemplateObject.resources | Where-Object -Property type -EQ "Microsoft.Network/privateDnsZones/CNAME" | Where-Object {$_.name.Contains("'/todo'")})
-if ($cname) { 
-    if ($cname.properties.cnameRecord.cname -eq 'webserver.or.nottodo') { 
+if ($cname) {
+    if ($cname.properties.cnameRecord.cname -eq 'webserver.or.nottodo') {
         Write-Output "`u{2705} Checked CNAME DNS record - OK."
-    } else { 
+    } else {
         Write-Output `u{1F914}
         throw "Please make sure that you have a CNAME record for the 'todo' host points to the auto-registered DNS name of the webserver virtual machine ('webserver.or.nottodo') and try again."
     }
-} else { 
+} else {
     Write-Output `u{1F914}
     throw "Please make sure that you have a CNAME record for the 'todo' host created in your private DNS zone and try again."
 }

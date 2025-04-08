@@ -9,7 +9,7 @@ $mngSubnetName = "management"
 $mngSubnetIpRange = "10.20.30.128/26"
 
 $sshKeyName = "linuxboxsshkey"
-$sshKeyPublicKey = Get-Content "~/.ssh/id_rsa.pub"
+$sshKeyPublicKey = Get-Content "~/.ssh/victory/id_rsa.pub"
 
 $vmImage = "Ubuntu2204"
 $vmSize = "Standard_B1s"
@@ -54,7 +54,7 @@ New-AzVm `
 -size $vmSize `
 -SubnetName $webSubnetName `
 -VirtualNetworkName $virtualNetworkName `
--SshKeyName $sshKeyName 
+-SshKeyName $sshKeyName
 $Params = @{
     ResourceGroupName  = $resourceGroupName
     VMName             = $webVmName
@@ -81,4 +81,36 @@ New-AzVm `
 -PublicIpAddressName $jumpboxVmName
 
 
-# Write your code here  -> 
+# Create a private DNS zone
+Write-Host "Creating a private DNS zone ..."
+$privateDnsZone = New-AzPrivateDnsZone `
+  -ResourceGroupName $resourceGroupName `
+  -Name $privateDnsZoneName
+
+# Display information about the created zone
+$privateDnsZone
+
+# Link the private DNS zone to the virtual network
+Write-Host "Linking private DNS zone to the virtual network ..."
+New-AzPrivateDnsVirtualNetworkLink `
+  -ResourceGroupName $resourceGroupName `
+  -ZoneName $privateDnsZoneName `
+  -Name "todo-dns-link" `
+  -VirtualNetwork $virtualNetwork `
+  -EnableAutoRegistration:$true
+
+# Write-Host "Creating an A DNS record ..."
+# $Records = @()
+# $Records += New-AzPrivateDnsRecordConfig -IPv4Address $publicIP
+# New-AzPrivateDnsRecordSet -Name "todo" -RecordType A -ResourceGroupName $resourceGroupName -TTL 1800 -ZoneName $privateDnsZoneName -PrivateDnsRecords $Records
+
+# Create a CNAME record for the webserver in the private DNS zone
+Write-Host "Creating a CNAME record in the private DNS zone ..."
+$Records = New-AzPrivateDnsRecordConfig -Cname "webserver.or.nottodo"
+New-AzPrivateDnsRecordSet `
+  -ResourceGroupName $resourceGroupName `
+  -ZoneName $privateDnsZoneName `
+  -Name "todo" `
+  -RecordType CNAME `
+  -Ttl 3600 `
+  -PrivateDnsRecords $Records
