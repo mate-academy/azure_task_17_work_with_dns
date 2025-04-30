@@ -3,7 +3,6 @@ param(
     [string]$ArtifactsStorageAccountName='matestorage123'
 )
 
-# default script values
 $rgName = "mate-azure-task-17"
 $taskName = "task17"
 
@@ -12,7 +11,6 @@ $resourcesTemplateName = "exported-template.json"
 $tempFolderPath = "$PWD/temp"
 $artifactsConfigPath = "$PWD/artifacts.json"
 
-# initial validation
 Write-Output "Running initial validation"
 $context = Get-AzContext  
 if ($context)   
