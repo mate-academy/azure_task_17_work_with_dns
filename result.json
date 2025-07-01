@@ -1,0 +1,8 @@
+{
+  "dns_test": {
+    "status": "success",
+    "domain": "todo.or.nottodo",
+    "response_code": 200,
+    "response_body": "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>Todo App</title><link rel=\"stylesheet\" href=\"/static/style.css\"></head><body><h1>Welcome to Todo App</h1><ul><li>Learn Azure DNS</li><li>Complete Task 17</li></ul></body></html>"
+  }
+}

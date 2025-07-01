@@ -42,19 +42,34 @@ $webSubnet = New-AzVirtualNetworkSubnetConfig -Name $webSubnetName -AddressPrefi
 $mngSubnet = New-AzVirtualNetworkSubnetConfig -Name $mngSubnetName -AddressPrefix $mngSubnetIpRange -NetworkSecurityGroup $mngNsg
 $virtualNetwork = New-AzVirtualNetwork -Name $virtualNetworkName -ResourceGroupName $resourceGroupName -Location $location -AddressPrefix $vnetAddressPrefix -Subnet $webSubnet,$mngSubnet
 
+Write-Host "Creating private DNS zone $privateDnsZoneName ..."
+$privateDnsZone = New-AzPrivateDnsZone `
+    -ResourceGroupName $resourceGroupName `
+    -Name $privateDnsZoneName
+
+Write-Host "Linking DNS zone to virtual network with auto-registration..."
+$link = New-AzPrivateDnsVirtualNetworkLink `
+    -ResourceGroupName $resourceGroupName `
+    -ZoneName $privateDnsZoneName `
+    -Name "vnet-link" `
+    -VirtualNetworkId $virtualNetwork.Id `
+    -EnableRegistration
+
 Write-Host "Creating a SSH key resource ..."
 New-AzSshKey -Name $sshKeyName -ResourceGroupName $resourceGroupName -PublicKey $sshKeyPublicKey
 
 Write-Host "Creating a web server VM ..."
-New-AzVm `
+$webVm = New-AzVm `
 -ResourceGroupName $resourceGroupName `
 -Name $webVmName `
 -Location $location `
--image $vmImage `
--size $vmSize `
+-Image $vmImage `
+-Size $vmSize `
 -SubnetName $webSubnetName `
 -VirtualNetworkName $virtualNetworkName `
 -SshKeyName $sshKeyName 
+
+Write-Host "Installing web application..."
 $Params = @{
     ResourceGroupName  = $resourceGroupName
     VMName             = $webVmName
@@ -63,8 +78,21 @@ $Params = @{
     ExtensionType      = 'CustomScript'
     TypeHandlerVersion = '2.1'
     Settings          = @{fileUris = @('https://raw.githubusercontent.com/mate-academy/azure_task_17_work_with_dns/main/install-app.sh'); commandToExecute = './install-app.sh'}
- }
+}
 Set-AzVMExtension @Params
+
+# Ключова зміна: використовуємо ім'я хоста замість IP-адреси
+$targetFqdn = "$webVmName.$privateDnsZoneName"
+
+Write-Host "Creating CNAME record for todo.or.nottodo pointing to $targetFqdn..."
+$cnameRecord = New-AzPrivateDnsRecordConfig -Cname $targetFqdn
+New-AzPrivateDnsRecordSet `
+    -ResourceGroupName $resourceGroupName `
+    -ZoneName $privateDnsZoneName `
+    -Name "todo" `
+    -RecordType CNAME `
+    -Ttl 3600 `
+    -PrivateDnsRecords $cnameRecord
 
 Write-Host "Creating a public IP ..."
 $publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Basic -AllocationMethod Dynamic -DomainNameLabel $dnsLabel
@@ -73,12 +101,9 @@ New-AzVm `
 -ResourceGroupName $resourceGroupName `
 -Name $jumpboxVmName `
 -Location $location `
--image $vmImage `
--size $vmSize `
+-Image $vmImage `
+-Size $vmSize `
 -SubnetName $mngSubnetName `
 -VirtualNetworkName $virtualNetworkName `
 -SshKeyName $sshKeyName `
 -PublicIpAddressName $jumpboxVmName
-
-
-# Write your code here  -> 
