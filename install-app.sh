@@ -13,9 +13,9 @@ apt-get install python3-pip -yq
 # Create a directory for the app and download the files. 
 mkdir /app 
 # make sure to uncomment the line bellow and update the link with your GitHub username
-git clone https://github.com/mate-academy/azure_task_17_work_with_dns.git
+git clone https://github.com/Volodymyrdv/azure_task_17_work_with_dns.git
 cp -r azure_task_17_work_with_dns/app/* /app
-
+chmod +x /app/start.sh
 # create a service for the app via systemctl and start the app
 mv /app/todoapp.service /etc/systemd/system/
 systemctl daemon-reload

@@ -56,14 +56,14 @@ New-AzVm `
 -VirtualNetworkName $virtualNetworkName `
 -SshKeyName $sshKeyName 
 $Params = @{
-    ResourceGroupName  = $resourceGroupName
-    VMName             = $webVmName
-    Name               = 'CustomScript'
-    Publisher          = 'Microsoft.Azure.Extensions'
-    ExtensionType      = 'CustomScript'
-    TypeHandlerVersion = '2.1'
-    Settings          = @{fileUris = @('https://raw.githubusercontent.com/mate-academy/azure_task_17_work_with_dns/main/install-app.sh'); commandToExecute = './install-app.sh'}
- }
+   ResourceGroupName  = $resourceGroupName
+   VMName             = $webVmName
+   Name               = 'CustomScript'
+   Publisher          = 'Microsoft.Azure.Extensions'
+   ExtensionType      = 'CustomScript'
+   TypeHandlerVersion = '2.1'
+   Settings          = @{fileUris = @('https://raw.githubusercontent.com/mate-academy/azure_task_17_work_with_dns/main/install-app.sh'); commandToExecute = './install-app.sh'}
+}
 Set-AzVMExtension @Params
 
 Write-Host "Creating a public IP ..."
@@ -81,4 +81,27 @@ New-AzVm `
 -PublicIpAddressName $jumpboxVmName
 
 
-# Write your code here  -> 
+# Write your code here  ->
+Write-Host "Creating private DNS zone"
+$privateDnsZone = New-AzPrivateDnsZone `
+-Name $privateDnsZoneName `
+-ResourceGroupName $resourceGroupName;
+
+Write-Host "Creating private DNS zone virtual network link"
+$privateDnsZoneLink = New-AzPrivateDnsVirtualNetworkLink `
+-ResourceGroupName $resourceGroupName `
+-Name "mylink" `
+-VirtualNetworkId $virtualNetwork.Id `
+-ZoneName $privateDnsZoneName `
+-EnableRegistration;
+
+Write-Host "Creating private DNS zone Cname record for web server"
+$Records = @()
+$Records += New-AzPrivateDnsRecordConfig -Cname "webserver.$privateDnsZoneName"
+New-AzPrivateDnsRecordSet `
+-Name "todo" `
+-RecordType Cname `
+-ResourceGroupName $resourceGroupName `
+-Ttl 3600 `
+-ZoneName $privateDnsZoneName `
+-PrivateDnsRecords $Records;
