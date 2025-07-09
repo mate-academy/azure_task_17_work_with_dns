@@ -67,7 +67,7 @@ $Params = @{
 Set-AzVMExtension @Params
 
 Write-Host "Creating a public IP ..."
-$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Basic -AllocationMethod Dynamic -DomainNameLabel $dnsLabel
+$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Standard -AllocationMethod Static -DomainNameLabel $dnsLabel
 Write-Host "Creating a management VM ..."
 New-AzVm `
 -ResourceGroupName $resourceGroupName `
@@ -81,4 +81,36 @@ New-AzVm `
 -PublicIpAddressName $jumpboxVmName
 
 
-# Write your code here  -> 
+# Write your code here  ->
+# Create private DNS zone
+Write-Host "Creating private DNS zone..."
+$dnsZone = New-AzPrivateDnsZone `
+    -ResourceGroupName $resourceGroupName `
+    -Name $privateDnsZoneName
+
+# Link DNS zone to VNet with auto-registration enabled
+Write-Host "Linking private DNS zone to VNet..."
+New-AzPrivateDnsVirtualNetworkLink `
+    -ResourceGroupName $resourceGroupName `
+    -ZoneName $privateDnsZoneName `
+    -Name "vnet-link" `
+    -VirtualNetworkId $virtualNetwork.Id `
+    -EnableRegistration:$true
+
+# Wait a bit for auto-registration to propagate
+Write-Host "Waiting 60 seconds for auto-registration..."
+Start-Sleep -Seconds 60
+
+$targetFqdn = "$webVmName.$privateDnsZoneName"
+
+# Create the CNAME record configuration
+$record = New-AzPrivateDnsRecordConfig -Cname $targetFqdn
+
+# Створюємо CNAME-запис у приватній DNS-зоні
+New-AzPrivateDnsRecordSet `
+  -Name "todo" `
+  -RecordType CNAME `
+  -ResourceGroupName $resourceGroupName `
+  -ZoneName $privateDnsZoneName `
+  -Ttl 300 `
+  -PrivateDnsRecords $record
