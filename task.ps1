@@ -9,7 +9,7 @@ $mngSubnetName = "management"
 $mngSubnetIpRange = "10.20.30.128/26"
 
 $sshKeyName = "linuxboxsshkey"
-$sshKeyPublicKey = Get-Content "~/.ssh/id_rsa.pub"
+$sshKeyPublicKey = Get-Content "$env:USERPROFILE\.ssh\id_rsa.pub"
 
 $vmImage = "Ubuntu2204"
 $vmSize = "Standard_B1s"
@@ -27,8 +27,16 @@ Write-Host "Creating web network security group..."
 $webHttpRule = New-AzNetworkSecurityRuleConfig -Name "web" -Description "Allow HTTP" `
    -Access Allow -Protocol Tcp -Direction Inbound -Priority 100 -SourceAddressPrefix `
    Internet -SourcePortRange * -DestinationAddressPrefix * -DestinationPortRange 80,443
+$allowVNet8080 = New-AzNetworkSecurityRuleConfig -Name "Allow-VNet-8080" `
+    -Description "Allow VNet access to 8080" `
+    -Access Allow -Protocol Tcp -Direction Inbound `
+    -Priority 200 `
+    -SourceAddressPrefix "VirtualNetwork" `
+    -SourcePortRange * `
+    -DestinationAddressPrefix * `
+    -DestinationPortRange 8080
 $webNsg = New-AzNetworkSecurityGroup -ResourceGroupName $resourceGroupName -Location $location -Name `
-   $webSubnetName -SecurityRules $webHttpRule
+   $webSubnetName -SecurityRules $webHttpRule,$allowVNet8080
 
 Write-Host "Creating mngSubnet network security group..."
 $mngSshRule = New-AzNetworkSecurityRuleConfig -Name "ssh" -Description "Allow SSH" `
@@ -54,7 +62,7 @@ New-AzVm `
 -size $vmSize `
 -SubnetName $webSubnetName `
 -VirtualNetworkName $virtualNetworkName `
--SshKeyName $sshKeyName 
+-SshKeyName $sshKeyName
 $Params = @{
     ResourceGroupName  = $resourceGroupName
     VMName             = $webVmName
@@ -81,4 +89,30 @@ New-AzVm `
 -PublicIpAddressName $jumpboxVmName
 
 
-# Write your code here  -> 
+Write-Host "Creating private DNS zone ..."
+$dnsZone = New-AzPrivateDnsZone -ResourceGroupName $resourceGroupName -Name $privateDnsZoneName
+
+
+Write-Host "Linking private DNS zone to the virtual network ..."
+New-AzPrivateDnsVirtualNetworkLink -ResourceGroupName $resourceGroupName `
+    -ZoneName $privateDnsZoneName `
+    -Name "dnsLink" `
+    -VirtualNetworkId $virtualNetwork.Id `
+    -EnableRegistration
+
+Write-Host "Waiting for web VM DNS registration..."
+do {
+    $record = Get-AzPrivateDnsRecordSet -ResourceGroupName $resourceGroupName -ZoneName $privateDnsZoneName -Name $webVmName -RecordType A -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 5
+} while (-not $record)
+Write-Host "Web VM registered in DNS."
+
+Write-Host "Creating CNAME record in DNS zone ..."
+$recordSet = New-AzPrivateDnsRecordSet -ResourceGroupName $resourceGroupName `
+    -ZoneName $privateDnsZoneName `
+    -Name "todo" `
+    -RecordType CNAME `
+    -Ttl 3600
+
+Add-AzPrivateDnsRecordConfig -RecordSet $recordSet -Cname "webserver.$privateDnsZoneName"
+Set-AzPrivateDnsRecordSet -RecordSet $recordSet
