@@ -9,7 +9,7 @@ $mngSubnetName = "management"
 $mngSubnetIpRange = "10.20.30.128/26"
 
 $sshKeyName = "linuxboxsshkey"
-$sshKeyPublicKey = Get-Content "~/.ssh/id_rsa.pub"
+$sshKeyPublicKey = Get-Content "~/.ssh/id_ed25519.pub"
 
 $vmImage = "Ubuntu2204"
 $vmSize = "Standard_B1s"
@@ -24,23 +24,61 @@ Write-Host "Creating a resource group $resourceGroupName ..."
 New-AzResourceGroup -Name $resourceGroupName -Location $location
 
 Write-Host "Creating web network security group..."
-$webHttpRule = New-AzNetworkSecurityRuleConfig -Name "web" -Description "Allow HTTP" `
-   -Access Allow -Protocol Tcp -Direction Inbound -Priority 100 -SourceAddressPrefix `
-   Internet -SourcePortRange * -DestinationAddressPrefix * -DestinationPortRange 80,443
-$webNsg = New-AzNetworkSecurityGroup -ResourceGroupName $resourceGroupName -Location $location -Name `
-   $webSubnetName -SecurityRules $webHttpRule
+$webHttpRule = New-AzNetworkSecurityRuleConfig `
+  -Name "web" `
+  -Description "Allow HTTP" `
+  -Access Allow `
+  -Protocol Tcp `
+  -Direction Inbound `
+  -Priority 100 `
+  -SourceAddressPrefix Internet `
+  -SourcePortRange * `
+  -DestinationAddressPrefix * `
+  -DestinationPortRange 80, 443, 8080
+
+$webNsg = New-AzNetworkSecurityGroup `
+  -ResourceGroupName $resourceGroupName `
+  -Location $location `
+  -Name $webSubnetName `
+  -SecurityRules $webHttpRule
 
 Write-Host "Creating mngSubnet network security group..."
-$mngSshRule = New-AzNetworkSecurityRuleConfig -Name "ssh" -Description "Allow SSH" `
-   -Access Allow -Protocol Tcp -Direction Inbound -Priority 100 -SourceAddressPrefix `
-   Internet -SourcePortRange * -DestinationAddressPrefix * -DestinationPortRange 22
-$mngNsg = New-AzNetworkSecurityGroup -ResourceGroupName $resourceGroupName -Location $location -Name `
-   $mngSubnetName -SecurityRules $mngSshRule
+$mngSshRule = New-AzNetworkSecurityRuleConfig `
+  -Name "ssh" `
+  -Description "Allow SSH" `
+  -Access Allow `
+  -Protocol Tcp `
+  -Direction Inbound `
+  -Priority 100 `
+  -SourceAddressPrefix Internet `
+  -SourcePortRange * `
+  -DestinationAddressPrefix * `
+  -DestinationPortRange 22
+
+$mngNsg = New-AzNetworkSecurityGroup `
+  -ResourceGroupName $resourceGroupName `
+  -Location $location `
+  -Name $mngSubnetName `
+  -SecurityRules $mngSshRule
 
 Write-Host "Creating a virtual network ..."
-$webSubnet = New-AzVirtualNetworkSubnetConfig -Name $webSubnetName -AddressPrefix $webSubnetIpRange -NetworkSecurityGroup $webNsg
-$mngSubnet = New-AzVirtualNetworkSubnetConfig -Name $mngSubnetName -AddressPrefix $mngSubnetIpRange -NetworkSecurityGroup $mngNsg
-$virtualNetwork = New-AzVirtualNetwork -Name $virtualNetworkName -ResourceGroupName $resourceGroupName -Location $location -AddressPrefix $vnetAddressPrefix -Subnet $webSubnet,$mngSubnet
+
+$webSubnet = New-AzVirtualNetworkSubnetConfig `
+  -Name $webSubnetName `
+  -AddressPrefix $webSubnetIpRange `
+  -NetworkSecurityGroup $webNsg
+
+$mngSubnet = New-AzVirtualNetworkSubnetConfig `
+  -Name $mngSubnetName `
+  -AddressPrefix $mngSubnetIpRange `
+  -NetworkSecurityGroup $mngNsg
+
+$virtualNetwork = New-AzVirtualNetwork `
+  -Name $virtualNetworkName `
+  -ResourceGroupName $resourceGroupName `
+  -Location $location `
+  -AddressPrefix $vnetAddressPrefix `
+  -Subnet $webSubnet,$mngSubnet
 
 Write-Host "Creating a SSH key resource ..."
 New-AzSshKey -Name $sshKeyName -ResourceGroupName $resourceGroupName -PublicKey $sshKeyPublicKey
@@ -54,7 +92,7 @@ New-AzVm `
 -size $vmSize `
 -SubnetName $webSubnetName `
 -VirtualNetworkName $virtualNetworkName `
--SshKeyName $sshKeyName 
+-SshKeyName $sshKeyName
 $Params = @{
     ResourceGroupName  = $resourceGroupName
     VMName             = $webVmName
@@ -67,18 +105,47 @@ $Params = @{
 Set-AzVMExtension @Params
 
 Write-Host "Creating a public IP ..."
-$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Basic -AllocationMethod Dynamic -DomainNameLabel $dnsLabel
+$publicIP = New-AzPublicIpAddress `
+  -Name $jumpboxVmName `
+  -ResourceGroupName $resourceGroupName `
+  -Location $location `
+  -Sku Standard `
+  -AllocationMethod Static `
+  -DomainNameLabel $dnsLabel
+
 Write-Host "Creating a management VM ..."
 New-AzVm `
--ResourceGroupName $resourceGroupName `
--Name $jumpboxVmName `
--Location $location `
--image $vmImage `
--size $vmSize `
--SubnetName $mngSubnetName `
--VirtualNetworkName $virtualNetworkName `
--SshKeyName $sshKeyName `
--PublicIpAddressName $jumpboxVmName
+  -ResourceGroupName $resourceGroupName `
+  -Name $jumpboxVmName `
+  -Location $location `
+  -image $vmImage `
+  -size $vmSize `
+  -SubnetName $mngSubnetName `
+  -VirtualNetworkName $virtualNetworkName `
+  -SshKeyName $sshKeyName `
+  -PublicIpAddressName $jumpboxVmName
 
+Write-Host "Creating a Private DNS Zone ..."
+New-AzPrivateDnsZone `
+  -ResourceGroupName $resourceGroupName `
+  -Name $privateDnsZoneName
 
-# Write your code here  -> 
+Write-Host "Creating a Private Virtual Network Link ..."
+New-AzPrivateDnsVirtualNetworkLink `
+  -ResourceGroupName $resourceGroupName `
+  -ZoneName $privateDnsZoneName `
+  -Name "link-to-private-dns-zone" `
+  -VirtualNetworkId $virtualNetwork.Id `
+  -EnableRegistration
+
+Write-Host "Creating a Private DNS RecordSet..."
+
+$Records = @()
+$Records += New-AzPrivateDnsRecordConfig -Cname "$webVmName.$privateDnsZoneName"
+New-AzPrivateDnsRecordSet `
+  -ResourceGroupName $resourceGroupName `
+  -ZoneName $privateDnsZoneName `
+  -Name "todo" `
+  -RecordType CNAME `
+  -Ttl 3600 `
+  -PrivateDnsRecords $Records
