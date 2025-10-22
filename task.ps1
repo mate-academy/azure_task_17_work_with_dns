@@ -67,7 +67,7 @@ $Params = @{
 Set-AzVMExtension @Params
 
 Write-Host "Creating a public IP ..."
-$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Basic -AllocationMethod Dynamic -DomainNameLabel $dnsLabel
+$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -AllocationMethod Static -DomainNameLabel $dnsLabel
 Write-Host "Creating a management VM ..."
 New-AzVm `
 -ResourceGroupName $resourceGroupName `
@@ -80,5 +80,15 @@ New-AzVm `
 -SshKeyName $sshKeyName `
 -PublicIpAddressName $jumpboxVmName
 
+$vnetLinkName = "vnetlink"
 
-# Write your code here  -> 
+Write-Host "Creating a private DNS zone ..."
+$Zone = New-AzPrivateDnsZone -Name $privateDnsZoneName -ResourceGroupName $resourceGroupName
+
+Write-Host "Linking the virtual network to the private DNS zone ..."
+$Link = New-AzPrivateDnsVirtualNetworkLink -ZoneName $privateDnsZoneName -ResourceGroupName $resourceGroupName -Name $vnetLinkName -VirtualNetworkId $virtualNetwork.Id -EnableRegistration
+
+Write-Host "Creating a CNAME record in the private DNS zone ..."
+$Records = @()
+$Records += New-AzPrivateDnsRecordConfig -Cname "$webVmName.$privateDnsZoneName"
+$RecordSet = New-AzPrivateDnsRecordSet -Name "todo" -RecordType CNAME -ResourceGroupName $resourceGroupName -TTL 3600 -ZoneName $privateDnsZoneName -PrivateDnsRecords $Records
