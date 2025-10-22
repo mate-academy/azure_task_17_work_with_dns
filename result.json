@@ -1,0 +1,27 @@
+# Створіть базовий result.json файл
+@'
+{
+  "dnsZone": {
+    "name": "or.nottodo",
+    "cnameRecord": "todo",
+    "target": "webserver.or.nottodo"
+  },
+  "virtualNetwork": {
+    "name": "todoapp",
+    "subnets": [
+      {
+        "name": "webservers",
+        "nsg": "webservers"
+      },
+      {
+        "name": "management", 
+        "nsg": "management"
+      }
+    ]
+  },
+  "vms": {
+    "webServer": "webserver",
+    "jumpbox": "jumpbox"
+  }
+}
+'@ | Set-Content -Path "result.json" -Encoding UTF8
