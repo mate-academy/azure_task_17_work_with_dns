@@ -19,7 +19,6 @@ $dnsLabel = "matetask" + (Get-Random -Count 1)
 
 $privateDnsZoneName = "or.nottodo"
 
-
 Write-Host "Creating a resource group $resourceGroupName ..."
 New-AzResourceGroup -Name $resourceGroupName -Location $location
 
@@ -54,7 +53,8 @@ New-AzVm `
 -size $vmSize `
 -SubnetName $webSubnetName `
 -VirtualNetworkName $virtualNetworkName `
--SshKeyName $sshKeyName 
+-SshKeyName $sshKeyName
+
 $Params = @{
     ResourceGroupName  = $resourceGroupName
     VMName             = $webVmName
@@ -63,11 +63,12 @@ $Params = @{
     ExtensionType      = 'CustomScript'
     TypeHandlerVersion = '2.1'
     Settings          = @{fileUris = @('https://raw.githubusercontent.com/mate-academy/azure_task_17_work_with_dns/main/install-app.sh'); commandToExecute = './install-app.sh'}
- }
+}
 Set-AzVMExtension @Params
 
 Write-Host "Creating a public IP ..."
-$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Basic -AllocationMethod Dynamic -DomainNameLabel $dnsLabel
+$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Standard -AllocationMethod Static -DomainNameLabel $dnsLabel
+
 Write-Host "Creating a management VM ..."
 New-AzVm `
 -ResourceGroupName $resourceGroupName `
@@ -80,5 +81,25 @@ New-AzVm `
 -SshKeyName $sshKeyName `
 -PublicIpAddressName $jumpboxVmName
 
+Write-Host "Creating a private DNS zone..."
+$privateDnsZone = New-AzPrivateDnsZone -ResourceGroupName $resourceGroupName -Name $privateDnsZoneName
 
-# Write your code here  -> 
+Write-Host "Linking private DNS zone to virtual network..."
+New-AzPrivateDnsVirtualNetworkLink -ResourceGroupName $resourceGroupName `
+  -ZoneName $privateDnsZoneName `
+  -Name "vnl-todoapp" `
+  -VirtualNetworkId $virtualNetwork.Id `
+  -EnableRegistration
+
+Write-Host "Creating CNAME record in private DNS zone..."
+
+$cnameTtl = 3600
+$cname = New-AzPrivateDnsRecordConfig -Cname "webserver.$privateDnsZoneName"
+New-AzPrivateDnsRecordSet -ResourceGroupName $resourceGroupName `
+  -ZoneName $privateDnsZoneName `
+  -Name "todo" `
+  -RecordType CNAME `
+  -Ttl $cnameTtl `
+  -PrivateDnsRecords $cname
+
+Write-Host "DNS configuration completed."
