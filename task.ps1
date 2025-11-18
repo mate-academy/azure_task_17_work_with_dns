@@ -9,7 +9,7 @@ $mngSubnetName = "management"
 $mngSubnetIpRange = "10.20.30.128/26"
 
 $sshKeyName = "linuxboxsshkey"
-$sshKeyPublicKey = Get-Content "~/.ssh/id_rsa.pub"
+$sshKeyPublicKey = Get-Content "~/.ssh/id_ed25519.pub" -Raw
 
 $vmImage = "Ubuntu2204"
 $vmSize = "Standard_B1s"
@@ -67,7 +67,7 @@ $Params = @{
 Set-AzVMExtension @Params
 
 Write-Host "Creating a public IP ..."
-$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Basic -AllocationMethod Dynamic -DomainNameLabel $dnsLabel
+New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Standard -AllocationMethod Static -DomainNameLabel $dnsLabel
 Write-Host "Creating a management VM ..."
 New-AzVm `
 -ResourceGroupName $resourceGroupName `
@@ -81,4 +81,12 @@ New-AzVm `
 -PublicIpAddressName $jumpboxVmName
 
 
-# Write your code here  -> 
+# Write your code here  ->
+$privateDnsZoneName = "or.nottodo"
+New-AzPrivateDnsZone -Name $privateDnsZoneName -ResourceGroupName $resourceGroupName
+$linkName = "$($virtualNetworkName)-link"
+New-AzPrivateDnsVirtualNetworkLink -ResourceGroupName $resourceGroupName -ZoneName $privateDnsZoneName -Name $linkName -VirtualNetworkId $virtualNetwork.Id -EnableRegistration
+
+$cnameTarget = "$webVmName.$privateDnsZoneName"
+$cnameRecordConfig = New-AzPrivateDnsRecordConfig -Cname $cnameTarget
+New-AzPrivateDnsRecordSet -Name "todo" -RecordType CNAME -ZoneName $privateDnsZoneName -ResourceGroupName $resourceGroupName -Ttl 3600 -PrivateDnsRecords @($cnameRecordConfig)
