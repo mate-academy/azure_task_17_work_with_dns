@@ -12,7 +12,7 @@ $sshKeyName = "linuxboxsshkey"
 $sshKeyPublicKey = Get-Content "~/.ssh/id_rsa.pub"
 
 $vmImage = "Ubuntu2204"
-$vmSize = "Standard_B1s"
+$vmSize = "Standard_B2s"
 $webVmName = "webserver"
 $jumpboxVmName = "jumpbox"
 $dnsLabel = "matetask" + (Get-Random -Count 1)
@@ -46,15 +46,27 @@ Write-Host "Creating a SSH key resource ..."
 New-AzSshKey -Name $sshKeyName -ResourceGroupName $resourceGroupName -PublicKey $sshKeyPublicKey
 
 Write-Host "Creating a web server VM ..."
-New-AzVm `
--ResourceGroupName $resourceGroupName `
--Name $webVmName `
--Location $location `
--image $vmImage `
--size $vmSize `
--SubnetName $webSubnetName `
--VirtualNetworkName $virtualNetworkName `
--SshKeyName $sshKeyName 
+# --- get VNet / subnets ---
+$vnet = Get-AzVirtualNetwork -ResourceGroupName $resourceGroupName -Name $virtualNetworkName
+$webSubnet = $vnet.Subnets | Where-Object { $_.Name -eq $webSubnetName }
+
+# --- admin user
+$adminUsername = "azureuser"
+$adminPassword = ConvertTo-SecureString ("P@" + (New-Guid).Guid) -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential ($adminUsername, $adminPassword)
+
+# --- WEB NIC (NO Public IP) ---
+$webIpCfg = New-AzNetworkInterfaceIpConfig -Name "ipconfig1" -SubnetId $webSubnet.Id
+$webNic = New-AzNetworkInterface -Name "$webVmName-nic" -ResourceGroupName $resourceGroupName -Location $location -IpConfiguration $webIpCfg
+
+# --- WEB VM config ---
+$webVmConfig = New-AzVMConfig -VMName $webVmName -VMSize $vmSize |
+  Set-AzVMOperatingSystem -Linux -ComputerName $webVmName -Credential $cred -DisablePasswordAuthentication |
+  Set-AzVMSourceImage -PublisherName Canonical -Offer "0001-com-ubuntu-server-jammy" -Skus "22_04-lts-gen2" -Version "latest" |
+  Add-AzVMNetworkInterface -Id $webNic.Id |
+  Add-AzVMSshPublicKey -KeyData $sshKeyPublicKey -Path "/home/$adminUsername/.ssh/authorized_keys"
+
+New-AzVM -ResourceGroupName $resourceGroupName -Location $location -VM $webVmConfig
 $Params = @{
     ResourceGroupName  = $resourceGroupName
     VMName             = $webVmName
@@ -62,12 +74,12 @@ $Params = @{
     Publisher          = 'Microsoft.Azure.Extensions'
     ExtensionType      = 'CustomScript'
     TypeHandlerVersion = '2.1'
-    Settings          = @{fileUris = @('https://raw.githubusercontent.com/mate-academy/azure_task_17_work_with_dns/main/install-app.sh'); commandToExecute = './install-app.sh'}
+    Settings          = @{fileUris = @('https://raw.githubusercontent.com/KyryloKilin/azure_task_17_work_with_dns/main/install-app.sh'); commandToExecute = './install-app.sh'}
  }
 Set-AzVMExtension @Params
 
 Write-Host "Creating a public IP ..."
-$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Basic -AllocationMethod Dynamic -DomainNameLabel $dnsLabel
+$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Standard -AllocationMethod Static -DomainNameLabel $dnsLabel
 Write-Host "Creating a management VM ..."
 New-AzVm `
 -ResourceGroupName $resourceGroupName `
@@ -78,7 +90,31 @@ New-AzVm `
 -SubnetName $mngSubnetName `
 -VirtualNetworkName $virtualNetworkName `
 -SshKeyName $sshKeyName `
--PublicIpAddressName $jumpboxVmName
+-PublicIpAddressName $jumpboxVmName `
+-Credential $cred
 
 
 # Write your code here  -> 
+Write-Host "Creating Private DNS zone..."
+$dnsZone = New-AzPrivateDnsZone -ResourceGroupName $resourceGroupName -Name $privateDnsZoneName
+
+Write-Host "Linking Private DNS zone to VNet with auto-registration..."
+$vnet = Get-AzVirtualNetwork -ResourceGroupName $resourceGroupName -Name $virtualNetworkName
+
+New-AzPrivateDnsVirtualNetworkLink `
+  -ResourceGroupName $resourceGroupName `
+  -ZoneName $privateDnsZoneName `
+  -Name "${virtualNetworkName}-link" `
+  -VirtualNetworkId $vnet.Id `
+  -EnableRegistration
+
+Write-Host "Creating CNAME todo -> webserver.$privateDnsZoneName ..."
+$rs = New-AzPrivateDnsRecordSet `
+  -ResourceGroupName $resourceGroupName `
+  -ZoneName $privateDnsZoneName `
+  -Name "todo" `
+  -RecordType CNAME `
+  -Ttl 3600
+
+$rs = Add-AzPrivateDnsRecordConfig -RecordSet $rs -Cname "$webVmName.$privateDnsZoneName"
+Set-AzPrivateDnsRecordSet -RecordSet $rs
