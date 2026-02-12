@@ -16,7 +16,7 @@ mkdir /app
 cd /app
 rm -rf /app/repo
 git clone https://github.com/KyryloKilin/azure_task_17_work_with_dns.git repo
-cp -r azure_task_17_work_with_dns/app/* /app
+cp -r /app/repo/app/* /app
 
 # create a service for the app via systemctl and start the app
 mv /app/todoapp.service /etc/systemd/system/
