@@ -1,4 +1,4 @@
-$location = "uksouth"
+$location = "polandcentral"
 $resourceGroupName = "mate-azure-task-17"
 
 $virtualNetworkName = "todoapp"
@@ -12,13 +12,14 @@ $sshKeyName = "linuxboxsshkey"
 $sshKeyPublicKey = Get-Content "~/.ssh/id_rsa.pub"
 
 $vmImage = "Ubuntu2204"
-$vmSize = "Standard_B1s"
+$vmSize = "Standard_D2s_v3"
 $webVmName = "webserver"
 $jumpboxVmName = "jumpbox"
 $dnsLabel = "matetask" + (Get-Random -Count 1)
 
 $privateDnsZoneName = "or.nottodo"
-
+$cnameDnsRecord = "todo"
+$networkLinkName = "link"
 
 Write-Host "Creating a resource group $resourceGroupName ..."
 New-AzResourceGroup -Name $resourceGroupName -Location $location
@@ -67,7 +68,7 @@ $Params = @{
 Set-AzVMExtension @Params
 
 Write-Host "Creating a public IP ..."
-$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Basic -AllocationMethod Dynamic -DomainNameLabel $dnsLabel
+$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Standard -AllocationMethod Static -DomainNameLabel $dnsLabel
 Write-Host "Creating a management VM ..."
 New-AzVm `
 -ResourceGroupName $resourceGroupName `
@@ -82,3 +83,12 @@ New-AzVm `
 
 
 # Write your code here  -> 
+$virtualNetwork = Get-AzVirtualNetwork -Name $virtualNetworkName -ResourceGroupName $resourceGroupName
+
+$privateDnsZone = New-AzPrivateDnsZone -ResourceGroupName $resourceGroupName -Name $privateDnsZoneName
+
+$privateDnsNetworkLink = New-AzPrivateDnsVirtualNetworkLink -Name $networkLinkName -ResourceGroupName $resourceGroupName -VirtualNetworkId $virtualNetwork.Id -ZoneName $privateDnsZoneName -EnableRegistration
+
+$cnameWebRecord = New-AzPrivateDnsRecordConfig -Cname "$webVmName.$privateDnsZoneName"
+
+New-AzPrivateDnsRecordSet -ResourceGroupName $resourceGroupName -Name $cnameDnsRecord -RecordType "CNAME" -ZoneName $privateDnsZoneName -PrivateDnsRecords $cnameWebRecord -Ttl 3600
