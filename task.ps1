@@ -1,4 +1,4 @@
-$location = "uksouth"
+$location = "denmarkeast"
 $resourceGroupName = "mate-azure-task-17"
 
 $virtualNetworkName = "todoapp"
@@ -44,17 +44,18 @@ $virtualNetwork = New-AzVirtualNetwork -Name $virtualNetworkName -ResourceGroupN
 
 Write-Host "Creating a SSH key resource ..."
 New-AzSshKey -Name $sshKeyName -ResourceGroupName $resourceGroupName -PublicKey $sshKeyPublicKey
+do { Start-Sleep -Seconds 10 } until (Get-AzSshKey -Name $sshKeyName -ResourceGroupName $resourceGroupName -ErrorAction SilentlyContinue)
+
+$adminCredential = New-Object System.Management.Automation.PSCredential ("azureuser", (ConvertTo-SecureString "Mate2026!Secure" -AsPlainText -Force))
 
 Write-Host "Creating a web server VM ..."
-New-AzVm `
--ResourceGroupName $resourceGroupName `
--Name $webVmName `
--Location $location `
--image $vmImage `
--size $vmSize `
--SubnetName $webSubnetName `
--VirtualNetworkName $virtualNetworkName `
--SshKeyName $sshKeyName 
+$webNic = New-AzNetworkInterface -Name "$webVmName-nic" -ResourceGroupName $resourceGroupName -Location $location -SubnetId ($virtualNetwork.Subnets | Where-Object { $_.Name -eq $webSubnetName }).Id
+$webVmConfig = New-AzVMConfig -VMName $webVmName -VMSize $vmSize
+$webVmConfig = Set-AzVMOperatingSystem -VM $webVmConfig -Linux -ComputerName $webVmName -Credential $adminCredential -DisablePasswordAuthentication
+$webVmConfig = Set-AzVMSourceImage -VM $webVmConfig -PublisherName "Canonical" -Offer "0001-com-ubuntu-server-jammy" -Skus "22_04-lts-gen2" -Version "latest"
+$webVmConfig = Add-AzVMNetworkInterface -VM $webVmConfig -Id $webNic.Id
+$webVmConfig = Add-AzVMSshPublicKey -VM $webVmConfig -KeyData $sshKeyPublicKey -Path "/home/azureuser/.ssh/authorized_keys"
+New-AzVM -ResourceGroupName $resourceGroupName -Location $location -VM $webVmConfig
 $Params = @{
     ResourceGroupName  = $resourceGroupName
     VMName             = $webVmName
@@ -67,18 +68,25 @@ $Params = @{
 Set-AzVMExtension @Params
 
 Write-Host "Creating a public IP ..."
-$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Basic -AllocationMethod Dynamic -DomainNameLabel $dnsLabel
+$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Standard -AllocationMethod Static -DomainNameLabel $dnsLabel
 Write-Host "Creating a management VM ..."
-New-AzVm `
--ResourceGroupName $resourceGroupName `
--Name $jumpboxVmName `
--Location $location `
--image $vmImage `
--size $vmSize `
--SubnetName $mngSubnetName `
--VirtualNetworkName $virtualNetworkName `
--SshKeyName $sshKeyName `
--PublicIpAddressName $jumpboxVmName
+$jumpboxNic = New-AzNetworkInterface -Name "$jumpboxVmName-nic" -ResourceGroupName $resourceGroupName -Location $location -SubnetId ($virtualNetwork.Subnets | Where-Object { $_.Name -eq $mngSubnetName }).Id -PublicIpAddressId $publicIP.Id
+$jumpboxVmConfig = New-AzVMConfig -VMName $jumpboxVmName -VMSize $vmSize
+$jumpboxVmConfig = Set-AzVMOperatingSystem -VM $jumpboxVmConfig -Linux -ComputerName $jumpboxVmName -Credential $adminCredential -DisablePasswordAuthentication
+$jumpboxVmConfig = Set-AzVMSourceImage -VM $jumpboxVmConfig -PublisherName "Canonical" -Offer "0001-com-ubuntu-server-jammy" -Skus "22_04-lts-gen2" -Version "latest"
+$jumpboxVmConfig = Add-AzVMNetworkInterface -VM $jumpboxVmConfig -Id $jumpboxNic.Id
+$jumpboxVmConfig = Add-AzVMSshPublicKey -VM $jumpboxVmConfig -KeyData $sshKeyPublicKey -Path "/home/azureuser/.ssh/authorized_keys"
+New-AzVM -ResourceGroupName $resourceGroupName -Location $location -VM $jumpboxVmConfig
 
 
-# Write your code here  -> 
+# Write your code here  ->
+
+Write-Host "Creating a private DNS zone $privateDnsZoneName ..."
+$privateDnsZone = New-AzPrivateDnsZone -ResourceGroupName $resourceGroupName -Name $privateDnsZoneName
+
+Write-Host "Linking the private DNS zone to the virtual network ..."
+New-AzPrivateDnsVirtualNetworkLink -ResourceGroupName $resourceGroupName -ZoneName $privateDnsZoneName -Name "$virtualNetworkName-link" -VirtualNetworkId $virtualNetwork.Id -EnableRegistration
+
+Write-Host "Creating a CNAME record todo.$privateDnsZoneName ..."
+$cnameRecord = New-AzPrivateDnsRecordConfig -Cname "$webVmName.$privateDnsZoneName"
+New-AzPrivateDnsRecordSet -ResourceGroupName $resourceGroupName -ZoneName $privateDnsZoneName -Name "todo" -RecordType CNAME -Ttl 3600 -PrivateDnsRecords $cnameRecord
