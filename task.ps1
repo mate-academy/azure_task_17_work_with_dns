@@ -1,4 +1,4 @@
-$location = "uksouth"
+$location = "polandcentral"
 $resourceGroupName = "mate-azure-task-17"
 
 $virtualNetworkName = "todoapp"
@@ -12,7 +12,7 @@ $sshKeyName = "linuxboxsshkey"
 $sshKeyPublicKey = Get-Content "~/.ssh/id_rsa.pub"
 
 $vmImage = "Ubuntu2204"
-$vmSize = "Standard_B1s"
+$vmSize = "Standard_D2s_v3"
 $webVmName = "webserver"
 $jumpboxVmName = "jumpbox"
 $dnsLabel = "matetask" + (Get-Random -Count 1)
@@ -26,7 +26,7 @@ New-AzResourceGroup -Name $resourceGroupName -Location $location
 Write-Host "Creating web network security group..."
 $webHttpRule = New-AzNetworkSecurityRuleConfig -Name "web" -Description "Allow HTTP" `
    -Access Allow -Protocol Tcp -Direction Inbound -Priority 100 -SourceAddressPrefix `
-   Internet -SourcePortRange * -DestinationAddressPrefix * -DestinationPortRange 80,443
+   Internet -SourcePortRange * -DestinationAddressPrefix * -DestinationPortRange 80,443,8080
 $webNsg = New-AzNetworkSecurityGroup -ResourceGroupName $resourceGroupName -Location $location -Name `
    $webSubnetName -SecurityRules $webHttpRule
 
@@ -67,7 +67,7 @@ $Params = @{
 Set-AzVMExtension @Params
 
 Write-Host "Creating a public IP ..."
-$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Basic -AllocationMethod Dynamic -DomainNameLabel $dnsLabel
+$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Standard -AllocationMethod Static -DomainNameLabel $dnsLabel
 Write-Host "Creating a management VM ..."
 New-AzVm `
 -ResourceGroupName $resourceGroupName `
@@ -78,7 +78,18 @@ New-AzVm `
 -SubnetName $mngSubnetName `
 -VirtualNetworkName $virtualNetworkName `
 -SshKeyName $sshKeyName `
--PublicIpAddressName $jumpboxVmName
+-PublicIpAddressName $publicIP
 
 
 # Write your code here  -> 
+$Zone = New-AzPrivateDnsZone -Name $privateDnsZoneName -ResourceGroupName $resourceGroupName
+
+$Link = New-AzPrivateDnsVirtualNetworkLink -ZoneName $privateDnsZoneName -ResourceGroupName $resourceGroupName `
+-Name "mylink" -VirtualNetworkId $virtualNetwork.Id  -EnableRegistration
+
+$Records = @()
+$Records += New-AzPrivateDnsRecordConfig -Cname "$webVmName.$privateDnsZoneName"
+
+$RecordSet = New-AzPrivateDnsRecordSet -Name "todo" -RecordType CNAME `
+-ResourceGroupName $resourceGroupName -TTL 3600 -ZoneName $privateDnsZoneName `
+-PrivateDnsRecords $Records
