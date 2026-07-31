@@ -1,4 +1,4 @@
-$location = "uksouth"
+$location = "denmarkeast"
 $resourceGroupName = "mate-azure-task-17"
 
 $virtualNetworkName = "todoapp"
@@ -67,7 +67,8 @@ $Params = @{
 Set-AzVMExtension @Params
 
 Write-Host "Creating a public IP ..."
-$publicIP = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Basic -AllocationMethod Dynamic -DomainNameLabel $dnsLabel
+$publicIp = New-AzPublicIpAddress -Name $jumpboxVmName -ResourceGroupName $resourceGroupName -Location $location -Sku Basic -AllocationMethod Dynamic -DomainNameLabel $dnsLabel
+
 Write-Host "Creating a management VM ..."
 New-AzVm `
 -ResourceGroupName $resourceGroupName `
@@ -82,3 +83,21 @@ New-AzVm `
 
 
 # Write your code here  -> 
+Write-Host "Creating a Private DNS Zone ..."
+New-AzPrivateDnsZone `
+   -Name $privateDnsZoneName `
+   -ResourceGroupName $resourceGroupName
+
+New-AzPrivateDnsVirtualNetworkLink `
+   -ZoneName $privateDnsZoneName `
+   -ResourceGroupName $resourceGroupName `
+   -Name "$virtualNetworkName-link" `
+   -VirtualNetwork $virtualNetwork `
+   -EnableRegistration
+
+$Records = @()
+$Records += New-AzPrivateDnsRecordConfig -Cname "$webVmName.$privateDnsZoneName"
+
+New-AzPrivateDnsRecordSet -Name "todo" -RecordType CNAME `
+   -ResourceGroupName $resourceGroupName -TTL 3600 `
+   -ZoneName $privateDnsZoneName -PrivateDnsRecords $Records
