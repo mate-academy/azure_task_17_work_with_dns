@@ -1,4 +1,4 @@
-$location = "uksouth"
+$location = "denmarkeast"
 $resourceGroupName = "mate-azure-task-17"
 
 $virtualNetworkName = "todoapp"
@@ -80,5 +80,32 @@ New-AzVm `
 -SshKeyName $sshKeyName `
 -PublicIpAddressName $jumpboxVmName
 
+Write-Host "Creating private DNS zone $privateDnsZoneName ..."
 
-# Write your code here  -> 
+$privateDnsZone = New-AzPrivateDnsZone `
+    -ResourceGroupName $resourceGroupName `
+    -Name $privateDnsZoneName
+
+
+Write-Host "Linking private DNS zone to virtual network with auto-registration ..."
+
+New-AzPrivateDnsVirtualNetworkLink `
+    -ResourceGroupName $resourceGroupName `
+    -ZoneName $privateDnsZoneName `
+    -Name "todoapp-link" `
+    -VirtualNetworkId $virtualNetwork.Id `
+    -EnableRegistration
+
+
+Write-Host "Creating CNAME record todo.or.nottodo ..."
+
+$recordConfig = New-AzPrivateDnsRecordConfig `
+    -Cname "webserver.$privateDnsZoneName"
+
+New-AzPrivateDnsRecordSet `
+    -ResourceGroupName $resourceGroupName `
+    -ZoneName $privateDnsZoneName `
+    -Name "todo" `
+    -RecordType CNAME `
+    -Ttl 300 `
+    -PrivateDnsRecords $recordConfig
