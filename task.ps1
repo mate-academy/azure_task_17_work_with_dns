@@ -82,3 +82,31 @@ New-AzVm `
 
 
 # Write your code here  -> 
+
+Write-Host "Creating private DNS zone $privateDnsZoneName ..."
+New-AzPrivateDnsZone `
+    -Name $privateDnsZoneName `
+    -ResourceGroupName $resourceGroupName
+
+
+Write-Host "Linking private DNS zone to virtual network ..."
+New-AzPrivateDnsVirtualNetworkLink `
+    -ZoneName $privateDnsZoneName `
+    -ResourceGroupName $resourceGroupName `
+    -Name "todoapp-dns-link" `
+    -VirtualNetworkId $virtualNetwork.Id `
+    -EnableRegistration
+
+
+Write-Host "Creating CNAME record todo.$privateDnsZoneName ..."
+
+$cnameRecord = New-AzPrivateDnsRecordConfig `
+    -Cname "$webVmName.$privateDnsZoneName"
+
+New-AzPrivateDnsRecordSet `
+    -Name "todo" `
+    -RecordType CNAME `
+    -ZoneName $privateDnsZoneName `
+    -ResourceGroupName $resourceGroupName `
+    -Ttl 3600 `
+    -PrivateDnsRecords $cnameRecord
