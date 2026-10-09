@@ -1,4 +1,4 @@
-$location = "uksouth"
+$location = "westus2" # any region that is available in your Azure subscription
 $resourceGroupName = "mate-azure-task-17"
 
 $virtualNetworkName = "todoapp"
