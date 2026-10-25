@@ -18,6 +18,9 @@ $jumpboxVmName = "jumpbox"
 $dnsLabel = "matetask" + (Get-Random -Count 1)
 
 $privateDnsZoneName = "or.nottodo"
+$adminUsername = "azureuser"
+$adminPassword = ConvertTo-SecureString (New-Guid).Guid -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential ($adminUsername, $adminPassword)
 
 
 Write-Host "Creating a resource group $resourceGroupName ..."
@@ -54,6 +57,7 @@ New-AzVm `
 -size $vmSize `
 -SubnetName $webSubnetName `
 -VirtualNetworkName $virtualNetworkName `
+-Credential $cred `
 -SshKeyName $sshKeyName 
 $Params = @{
     ResourceGroupName  = $resourceGroupName
@@ -78,7 +82,27 @@ New-AzVm `
 -SubnetName $mngSubnetName `
 -VirtualNetworkName $virtualNetworkName `
 -SshKeyName $sshKeyName `
+-Credential $cred `
 -PublicIpAddressName $jumpboxVmName
 
 
-# Write your code here  -> 
+# Write your code here  ->
+
+Write-Host "Creating private DNS zone $privateDnsZoneName ..."
+$dnsZone = New-AzPrivateDnsZone -ResourceGroupName $resourceGroupName -Name $privateDnsZoneName
+
+Write-Host "Linking DNS zone to virtual network with auto-registration ..."
+New-AzPrivateDnsVirtualNetworkLink -ResourceGroupName $resourceGroupName `
+    -ZoneName $privateDnsZoneName `
+    -Name "$virtualNetworkName-link" `
+    -VirtualNetworkId $virtualNetwork.Id `
+    -EnableRegistration
+
+Write-Host "Creating CNAME record todo.$privateDnsZoneName -> $webVmName.$privateDnsZoneName ..."
+$cnameRecord = New-AzPrivateDnsRecordConfig -Cname "$webVmName.$privateDnsZoneName"
+New-AzPrivateDnsRecordSet -ResourceGroupName $resourceGroupName `
+    -ZoneName $privateDnsZoneName `
+    -Name "todo" `
+    -RecordType CNAME `
+    -Ttl 3600 `
+    -PrivateDnsRecords $cnameRecord
